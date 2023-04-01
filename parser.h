@@ -10,4 +10,11 @@ enum tokenType {
     TOKEN_TYPE_NUMBER
 };
 
+struct Cell {
+    char* data;
+    enum tokenType type;
+};
+
+void parser_init ();
+
 #endif
