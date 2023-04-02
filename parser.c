@@ -1,19 +1,19 @@
 #include "parser.h"
 
 static struct Cell* __cells;
-static unsigned* __bgnsrows;
+static unsigned* __pos1cols;
 static size_t __numbercells;
 
-void _doCell (struct Cell*);
+void _doCell (struct Cell* cell);
 
 void parser_init ()
 {
     __cells = (struct Cell*) malloc(0);
-    __bgnsrows = (unsigned*) malloc(0);
+    __pos1cols = (unsigned*) malloc(0);
     __numbercells = 0;
 }
 
-void parser_newCell (unsigned rowidx)
+void parser_newCell (unsigned numcells)
 {
     __cells = (struct Cell*) realloc(
         __cells, ++__numbercells * sizeof(struct Cell)
@@ -28,16 +28,31 @@ void parser_newCell (unsigned rowidx)
     __cells[__numbercells - 1] = newc;
 }
 
+void parser_newRow ()
+{
+    /* If there's empty lines at the beginnig of the file
+     * that would be interpreted as a new row, but it ain't,
+     * so just skip them. */
+    if (!__numbercells)
+        return;
+    
+    static unsigned numrows = 0;
+    __pos1cols = (unsigned*) realloc(
+        __pos1cols, ++numrows * sizeof(unsigned)
+    );
+    __pos1cols[numrows - 1] = (unsigned) __numbercells;
+}
+
 void parser_newToken (const char* data, const enum tokenType type)
 {
-    if ( !__numbercells ) {
+    if (!__numbercells) {
         fprintf(stderr, "Trying to push a new token, however any cell has been created.\n");
         fprintf(stderr, "Token: '%s'.\n", data);
         exit(EXIT_FAILURE);
     }
 
     struct Cell* currcell = &__cells[__numbercells - 1];
-    if ( !currcell->numtokens )
+    if (!currcell->numtokens)
         currcell->type = type;
 
     struct Token newt = {0};
@@ -53,25 +68,28 @@ void parser_newToken (const char* data, const enum tokenType type)
 
 void parser_parse ()
 {
-    for (unsigned i = 0; i < __numbercells; i++) {
+    unsigned currow = 0;
+    for (size_t i = 0; i < __numbercells; i++) {
+        if (__pos1cols[currow] == i) {
+            putchar(10);
+            currow++;
+        }
         _doCell(&__cells[i]);
-        free(__cells[i].data);
     }
-
     free(__cells);
-    free(__bgnsrows);
+    free(__pos1cols);
 }
 
 void _doCell (struct Cell* cell)
 {
     const enum tokenType ttype = cell->type;
-    if ( ttype == TOKEN_TYPE_STRING || ttype == TOKEN_TYPE_NUMBER || ttype == TOKEN_TYPE_ERROR ) {
+    if (ttype == TOKEN_TYPE_STRING || ttype == TOKEN_TYPE_NUMBER || ttype == TOKEN_TYPE_ERROR) {
         char* tokendata = cell->content[0].data;
         cell->data = (char*) realloc(cell->data, strlen(tokendata));
         strcpy(cell->data, tokendata);
     }
 
-    printf("%s |", cell->data);
+    printf("%s | ", cell->data);
     for (unsigned i = 0; i < cell->numtokens; i++)
         free(cell->content[i].data);
     free(cell->content);

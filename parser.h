@@ -23,7 +23,8 @@ struct Cell {
 };
 
 void parser_init ();
-void parser_newCell (unsigned);
+void parser_newCell ();
+void parser_newRow ();
 void parser_newToken (const char*, const enum tokenType);
 void parser_parse ();
 
