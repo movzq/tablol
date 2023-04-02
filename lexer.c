@@ -1,9 +1,9 @@
 #include "lexer.h"
 #include <ctype.h>
 
-typedef bool __getUntil (const char c);
-bool until_strings (const char c) { return c != '"'; }
-bool until_numbers (const char c) { return isdigit(c) || c == '.'; }
+typedef bool __getUntil (const char);
+bool _untilStrs (const char c) { return c != '"'; }
+bool _untilNums (const char c) { return isdigit(c) || c == '.'; }
 
 void lexer_getToken (__getUntil until, struct ustr* token, const char* content, size_t* pos, enum tokenType *type)
 {
@@ -17,10 +17,10 @@ void lexer_getToken (__getUntil until, struct ustr* token, const char* content, 
     } while (until(content[*pos]));
 
 
-    if (until == until_strings)
+    if (until == _untilStrs)
         ustr_erase(token, 0, 0);
 
-    if (until == until_numbers && npoints >= 2) {
+    if (until == _untilNums && npoints >= 2) {
         ustr_clear(token);
         ustr_append(token, "num_def!");
         *type = TOKEN_TYPE_ERROR;
@@ -37,14 +37,16 @@ void lexer_read (FILE* table)
     fread(content, 1, bytes, table);
     content[bytes] = '\0';
 
-    parser_init();
     struct ustr* token = ustr_make();
+    unsigned cellpos = 0;
+    parser_init();
+
     for (size_t i = 0; i < bytes; ++i) {
         while (isspace(content[i]))
             i++;
 
-        // XXX: Make a cell.
         if (content[i] == '|') {
+            parser_newCell(cellpos++);
             ustr_clear(token);
             i++;
         }
@@ -56,20 +58,21 @@ void lexer_read (FILE* table)
 
         if (isstring) {
             ttype = TOKEN_TYPE_STRING;
-            lexer_getToken(until_strings, token, content, &i, NULL);
+            lexer_getToken(_untilStrs, token, content, &i, NULL);
         }
         else if (isposnum || isnegnum) {
             ttype = TOKEN_TYPE_NUMBER;
-            lexer_getToken(until_numbers, token, content, &i, &ttype);
+            lexer_getToken(_untilNums, token, content, &i, &ttype);
         }
 
         if (token->size) {
-            printf("token: %s \t %d\n", token->data, ttype);
+            parser_newToken(token->data, ttype);
             ustr_clear(token);
         }
     }
 
-    ustr_kill(token);
     fclose(table);
+    ustr_kill(token);
     free(content);
+    parser_parse();
 }
