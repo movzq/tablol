@@ -6,7 +6,7 @@
 typedef bool __getUntil (const char);
 bool _untilStrs (const char c) { return c != '"'; }
 bool _untilNums (const char c) { return isdigit(c) || c == '.'; }
-void _getToken (__getUntil until, struct ustr* token, const char* content, size_t* pos, enum tokenType *type);
+void _getToken (__getUntil, struct ustr*, const char*, size_t*, enum tokenType *);
 
 void lexer_read (FILE* table)
 {

@@ -1,2 +1,7 @@
 do it with a specific style.
 use ustring for all strings not constant.
+
+
+errors and warnings:
+	num_def! : Wrong number definition.
+	0_token! : Cell with no tokens.
