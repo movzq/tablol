@@ -2,12 +2,14 @@
 #define _PARSER_H
 #include "ustring/ustring.h"
 #include <stdio.h>
+#include <ctype.h>
 
 enum tokenType {
     TOKEN_TYPE_ERROR   = 0,
-    TOKEN_TYPE_UNKNOWN = 1,
+    TOKEN_TYPE_COORDS  = 1,
     TOKEN_TYPE_STRING  = 2,
-    TOKEN_TYPE_NUMBER  = 3
+    TOKEN_TYPE_NUMBER  = 3,
+    TOKEN_TYPE_UNKNOWN = 4
 };
 
 struct Token {
@@ -16,16 +18,13 @@ struct Token {
 };
 
 struct Cell {
-    struct Token* content;
+    struct Token* list;
     char* data;
-    size_t numtokens;
     enum tokenType type;
 };
 
 void parser_init ();
 void parser_newCell ();
-void parser_newRow ();
-void parser_newToken (const char*, const enum tokenType);
-void parser_parse ();
+void parser_setNewRow ();
 
 #endif

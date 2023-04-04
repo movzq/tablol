@@ -1,84 +1,86 @@
 #include "lexer.h"
-#include <ctype.h>
 
-/* Functions to get the token depending on an specific
- * condition. */
-typedef bool __getUntil (const char);
-bool _untilStrs (const char c) { return c != '"'; }
-bool _untilNums (const char c) { return isdigit(c) || c == '.'; }
-void _getToken (__getUntil, struct ustr*, const char*, size_t*, enum tokenType *);
+typedef bool __getUntil (char);
+bool _tilString (char c) { return c != '"'; }
+bool _tilNumber (char c) { return isdigit(c) || c == '.'; }
+bool _tilCoords (char c) { return isdigit(c) || islower(c); }
+
+void _getToken (__getUntil, const char*, struct ustr*, size_t*, enum tokenType*);
 
 void lexer_read (FILE* table)
 {
     fseek(table, 0, SEEK_END);
-    size_t bytes = ftell(table);
+    size_t numbytes = ftell(table);
     fseek(table, 0, SEEK_SET);
 
-    char* content = (char*) malloc(bytes + 1);
-    fread(content, 1, bytes, table);
-    content[bytes] = '\0';
+    char* content = (char*) malloc(numbytes);
+    fread(content, numbytes, 1, table);
+    content[numbytes - 1] = '\0';
+    fclose(table);
 
     struct ustr* token = ustr_make();
     parser_init();
 
-    for (size_t i = 0; i < bytes; ++i) {
-        while (isspace(content[i]) && content[i] != '\n')
-            i++;
+    for (size_t pos = 0; pos < numbytes; ++pos) {
+        while (isspace(content[pos]) && content[pos] != '\n')
+            pos++;
 
-        /* New lines marks when a new row is gonna be created and every '|' character
-         * defines a new cell creation. */
-        if (content[i] == '\n') parser_newRow();
-        if (content[i] == '|') parser_newCell();
+        if (content[pos] == '|')
+            parser_newCell();
+        if (content[pos] == '\n')
+            parser_setNewRow();
 
-        enum tokenType ttype;
-        bool isstring = content[i] == '"';
-        bool isposnum = isdigit(content[i]);
-        bool isnegnum = content[i] == '-' && isdigit(ustr_at(token, i + 1));
+        bool tokenops[] = {
+            content[pos] == '@',                                      /* Coordinate to another cell. */
+            content[pos] == '"',                                      /* String literal. */
+            isdigit(content[pos]),                                    /* Positive number. */
+            content[pos] == '-' && isdigit(ustr_at(token, pos + 1))   /* Negative number. */
+        };
 
-        if (isstring) {
-            ttype = TOKEN_TYPE_STRING;
-            _getToken(_untilStrs, token, content, &i, NULL);
+        enum tokenType thistype;
+        if (tokenops[0]) {
+            thistype = TOKEN_TYPE_COORDS;
+            _getToken(_tilCoords, content, token, &pos, NULL);
         }
-        else if (isposnum || isnegnum) {
-            ttype = TOKEN_TYPE_NUMBER;
-            _getToken(_untilNums, token, content, &i, &ttype);
+        else if (tokenops[1]) {
+            thistype = TOKEN_TYPE_STRING;
+            _getToken(_tilString, content, token, &pos, NULL);
+        }
+        else if (tokenops[2] || tokenops[3]) {
+            thistype = TOKEN_TYPE_NUMBER;
+            _getToken(_tilNumber, content, token, &pos, &thistype);
         }
 
         if (token->size) {
-            parser_newToken(token->data, ttype);
             ustr_clear(token);
         }
     }
 
-    fclose(table);
     ustr_kill(token);
     free(content);
-    parser_parse();
 }
 
-void _getToken (__getUntil until, struct ustr* token, const char* content, size_t* pos, enum tokenType *type)
+void _getToken (__getUntil til, const char* content, struct ustr* token, size_t* pos, enum tokenType* type)
 {
     unsigned char npoints = 0;
     do {
-        if ( content[*pos] == '.' )
+        if (content[*pos] == '.')
             npoints++;
         ustr_pushBack(token, content[*pos]);
         *pos += 1;
-    } while (until(content[*pos]));
+    } while (til(content[*pos]));
 
-    /* When an string token is being created the first quote is added since
-     * that is what defines the token, however the last one is not since it
-     * defines the end, thus the first quote is removed to have the content
-     * of the string itself. */
-    if (until == _untilStrs)
+    /* Removes the first double-quote of the token to get
+     * only the string content itself. */
+    if (til == _tilString) {
         ustr_erase(token, 0, 0);
-
-    if (until == _untilNums) {
-        if (npoints >= 2) {
-            ustr_clear(token);
-            ustr_append(token, "num_def!");
-            *type = TOKEN_TYPE_ERROR;
-        }
-        *pos -= 1;
+        return;
     }
+    if (til == _tilNumber && npoints >= 2) {
+        ustr_clear(token);
+        ustr_append(token, "number_defintion!");
+        *type = TOKEN_TYPE_ERROR;
+    }
+
+    *pos -= 1;
 }
