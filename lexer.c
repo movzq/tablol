@@ -52,12 +52,14 @@ void lexer_read (FILE* table)
         }
 
         if (token->size) {
+            parser_newToken(token->data, thistype);
             ustr_clear(token);
         }
     }
 
     ustr_kill(token);
     free(content);
+    parser_print();
 }
 
 void _getToken (__getUntil til, const char* content, struct ustr* token, size_t* pos, enum tokenType* type)

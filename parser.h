@@ -19,6 +19,7 @@ struct Token {
 
 struct Cell {
     struct Token* list;
+    size_t numtokens;
     char* data;
     enum tokenType type;
 };
@@ -26,5 +27,7 @@ struct Cell {
 void parser_init ();
 void parser_newCell ();
 void parser_setNewRow ();
+void parser_newToken (const char*, const enum tokenType);
+void parser_print ();
 
 #endif
