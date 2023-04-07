@@ -1,16 +1,22 @@
 #include "parser.h"
+#include <math.h>
 
 static struct Cell* __table;
-static size_t __numcells;
 static size_t* __newrow_at;
+static size_t __numcells;
+static size_t __numrows;
 
 void _performCell (struct Cell*);
 void _setCellAsError (const char*, struct Cell*);
+void _cloneCell (struct Cell*);
+struct Cell* _getCellByCoords (struct Cell*);
+void _checkNoEmptyCell ();
 
 void parser_init ()
 {
     __table = (struct Cell*) malloc(0);
     __numcells = 0;
+    __numrows = 1;
 
     /* Saves the number of cell of every first cell
      * in a new row. */
@@ -20,9 +26,7 @@ void parser_init ()
 
 void parser_newCell ()
 {
-    if (__numcells && !__table[__numcells - 1].numtokens)
-        _setCellAsError("empty_cell!", &__table[__numcells - 1]);
-
+    _checkNoEmptyCell();
     __table = (struct Cell*) realloc(
         __table, ++__numcells * sizeof(struct Cell)
     );
@@ -42,15 +46,14 @@ void parser_setNewRow ()
     if (!__numcells)
         return;
 
-    static unsigned numrows = 0;
     __newrow_at = (size_t*) realloc(
-        __newrow_at, ++numrows * sizeof(size_t)
+        __newrow_at, ++__numrows * sizeof(size_t)
     );
 
     /* Since the current row has reached its end the
      * next cell on the table is gonna be the first
      * of the new row and it has a position of '__numcells'. */
-    __newrow_at[numrows - 1] = __numcells;
+    __newrow_at[__numrows - 1] = __numcells;
 }
 
 void parser_newToken (const char* data, const enum tokenType type)
@@ -85,6 +88,7 @@ void parser_newToken (const char* data, const enum tokenType type)
 
 void parser_print ()
 {
+    _checkNoEmptyCell();
     unsigned currow = 0;
     for (size_t i = 0; i < __numcells; i++) {
         if (__newrow_at[currow] == i) {
@@ -96,11 +100,15 @@ void parser_print ()
 
     free(__table);
     free(__newrow_at);
+    putchar(10);
 }
 
 void _performCell (struct Cell* cell)
 {
-    printf("(%s)|", cell->data);
+    if (cell->type == TOKEN_TYPE_COORDS)
+        _cloneCell(cell);
+
+    printf("%s | ", cell->data);
     for (size_t i = 0; i < cell->numtokens; i++)
         free(cell->list[i].data);
     free(cell->list);
@@ -113,3 +121,62 @@ void _setCellAsError (const char* msg, struct Cell* cell)
     cell->type = TOKEN_TYPE_ERROR;
 }
 
+void _cloneCell (struct Cell* cell)
+{
+    /* This cell make sure ain't a cycle
+     * while copying operation is being
+     * performed. */
+    static struct Cell* calledin = NULL;
+    struct Cell* clone = _getCellByCoords(cell);
+
+    if (cell == calledin) {
+        _setCellAsError("loop_dependecy!", cell);
+        return;
+    }
+
+    if (!calledin)
+        calledin = cell;
+    if (!clone) {
+        _setCellAsError("outta_range!", cell);
+        return;
+    }
+
+    if (clone->type == TOKEN_TYPE_COORDS)
+        _cloneCell(clone);
+
+
+    cell->type = clone->type;
+    cell->data = (char*) realloc(cell->data, strlen(clone->data));
+    strcpy(cell->data, clone->data);
+    calledin = NULL;
+}
+
+struct Cell* _getCellByCoords (struct Cell* cell)
+{
+    unsigned row = 0, col = 0;
+    struct ustr* rowvalue = ustr_make();
+
+    for (size_t i = 1; i < strlen(cell->data); i++) {
+        const char thisc = cell->data[i];
+        if (isupper(thisc)) col += thisc - 'A';
+        else ustr_pushBack(rowvalue, thisc);
+    }
+
+    if (rowvalue->size)
+        row += atoi(rowvalue->data);
+
+    free(rowvalue);
+    if (row >= __numrows)
+        return NULL;
+
+    unsigned pos = __newrow_at[row] + col;
+    if (pos >= __numcells)
+        return NULL;
+    return &__table[pos];
+}
+
+void _checkNoEmptyCell ()
+{
+    if (__numcells && !__table[__numcells - 1].numtokens)
+        _setCellAsError("empty_cell!", &__table[__numcells - 1]);
+}

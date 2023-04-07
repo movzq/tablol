@@ -3,7 +3,7 @@
 typedef bool __getUntil (char);
 bool _tilString (char c) { return c != '"'; }
 bool _tilNumber (char c) { return isdigit(c) || c == '.'; }
-bool _tilCoords (char c) { return isdigit(c) || islower(c); }
+bool _tilCoords (char c) { return isdigit(c) || isupper(c); }
 
 void _getToken (__getUntil, const char*, struct ustr*, size_t*, enum tokenType*);
 

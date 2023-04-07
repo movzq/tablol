@@ -2,7 +2,7 @@ compiler = gcc
 
 main: lexer.o tablol.o ustring/ustring.o parser.o;
 	$(compiler) -o tblol lexer.o tablol.o ustring/ustring.o parser.o
-	./tblol sheets/* | column -t -s '|'
+	./tblol sheets/coordinates | column -t -s '|'
 
 update_ustr:
 	cp ../ustring/ust* ./ustring
