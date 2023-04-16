@@ -2,32 +2,40 @@
 #define _PARSER_H
 #include "ustring/ustring.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
 
-enum tokenType {
-    TOKEN_TYPE_ERROR   = 0,
-    TOKEN_TYPE_COORDS  = 1,
-    TOKEN_TYPE_STRING  = 2,
-    TOKEN_TYPE_NUMBER  = 3,
-    TOKEN_TYPE_UNKNOWN = 4
+enum tablolTokenType {
+    TABLOL_STRING_TYPE  = '"',
+    TABLOL_NUMBER_TYPE  = '0',
+    TABLOL_ADD_SY_TYPE  = '+',
+    TABLOL_SUB_SY_TYPE  = '-',
+    TABLOL_DIV_SY_TYPE  = '/',
+    TABLOL_MUL_SY_TYPE  = '*',
+    TABLOL_LPA_SY_TYPE  = '(',
+    TABLOL_RPA_SY_TYPE  = ')',
+    TABLOL_EQU_SY_TYPE  = '=',
+    TABLOL_COORDS_TYPE  = '@',
+    TABLOL_UNKNOWN_TYPE = '?',
+    TABLOL_ERROR_TYPE   = '!'
 };
 
-struct Token {
+struct tablolToken {
     char* data;
-    enum tokenType type;
+    enum tablolTokenType type;
 };
 
-struct Cell {
-    struct Token* list;
-    size_t numtokens;
+struct tablolCell {
+    struct tablolToken* list;
+    size_t listsize;
     char* data;
-    enum tokenType type;
+    enum tablolTokenType type;
 };
 
 void parser_init ();
 void parser_newCell ();
-void parser_setNewRow ();
-void parser_newToken (const char*, const enum tokenType);
-void parser_print ();
+void parser_newRow ();
+void parser_newToken (const char*, const enum tablolTokenType);
+void parser_execute ();
 
 #endif

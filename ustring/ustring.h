@@ -1,8 +1,6 @@
 #ifndef _USTRING_H
 #define _USTRING_H
 #include <stdlib.h>
-#include <string.h>
-#include <assert.h>
 #include <stdbool.h>
 
 enum ustrPos {

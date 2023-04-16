@@ -1,7 +1,15 @@
-do it with a specific style.
-use ustring for all strings not constant.
+tablol.
+    This is a project to implement something like "excel" but -= 10000, however it is just for funny,
+    the idea was taken from a Tsoding video. The idea was successfully implemented, so the program
+    is able to do arithmetic operations, cells cloning and error reporting.
 
+    Errors:
+    * num_defintion: Wrong number defintion (Maybe..?).
+    * empty_cell: The current cell has not any tokens.
+    * loop_dependecy: A loop between cells occured.
+    * outta_range: Trying to clone a cell that doesn't exist.
+    * missing_args: Ain't operands nor operators enough to perform any arithmetic operation.
 
-errors and warnings:
-	num_def! : Wrong number definition.
-	0_token! : Cell with no tokens.
+    Clone method:
+    To be able to clone a cell the syntaxis must look like: @<column><row>
+    where column is a serie of upper-case letters and row is the row number (The orden does not matter).

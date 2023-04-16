@@ -1,79 +1,115 @@
 #include "lexer.h"
 
-typedef bool __getUntil (char);
-bool _tilString (char c) { return c != '"'; }
-bool _tilNumber (char c) { return isdigit(c) || c == '.'; }
-bool _tilCoords (char c) { return isdigit(c) || isupper(c); }
+/* The tokens such as strings, numbers and coordinates
+ * requires more than one character (numbers can be the execption)
+ * so it is necessary have conditions to get the whole token. */
+typedef bool __getTil (const char);
+bool _tilNumber (const char);
+bool _tilString (const char);
+bool _tilCoords (const char);
 
-void _getToken (__getUntil, const char*, struct ustr*, size_t*, enum tokenType*);
+enum tablolTokenType _isThisType (const char, const char);
+void _getWholeToken (__getTil, const char*, struct ustr*, size_t*, enum tablolTokenType*);
 
 void lexer_read (FILE* table)
 {
     fseek(table, 0, SEEK_END);
-    size_t numbytes = ftell(table);
+    size_t bytes = ftell(table);
     fseek(table, 0, SEEK_SET);
 
-    char* content = (char*) malloc(numbytes);
-    fread(content, numbytes, 1, table);
-    content[numbytes - 1] = '\0';
+    /* Reading the whole file. */
+    char* data = (char*) malloc(bytes);
+    fread(data, bytes, 1, table);
+    data[bytes - 1] = '\0';
     fclose(table);
 
     struct ustr* token = ustr_make();
     parser_init();
 
-    for (size_t pos = 0; pos < numbytes; ++pos) {
-        while (isspace(content[pos]) && content[pos] != '\n')
+    for (size_t pos = 0; pos < bytes; pos++) {
+        while (isspace(data[pos]) && data[pos] != '\n')
             pos++;
 
-        if (content[pos] == '|')
+        const char thisc = data[pos];
+        if (thisc == '|')
             parser_newCell();
-        if (content[pos] == '\n')
-            parser_setNewRow();
+        if (thisc == '\n')
+            parser_newRow();
 
-        bool tokenops[] = {
-            content[pos] == '@',                                      /* Coordinate to another cell. */
-            content[pos] == '"',                                      /* String literal. */
-            isdigit(content[pos]),                                    /* Positive number. */
-            content[pos] == '-' && isdigit(ustr_at(token, pos + 1))   /* Negative number. */
-        };
+        enum tablolTokenType thistype = _isThisType(thisc, data[pos + 1]);
 
-        enum tokenType thistype;
-        if (tokenops[0]) {
-            thistype = TOKEN_TYPE_COORDS;
-            _getToken(_tilCoords, content, token, &pos, NULL);
-        }
-        else if (tokenops[1]) {
-            thistype = TOKEN_TYPE_STRING;
-            _getToken(_tilString, content, token, &pos, NULL);
-        }
-        else if (tokenops[2] || tokenops[3]) {
-            thistype = TOKEN_TYPE_NUMBER;
-            _getToken(_tilNumber, content, token, &pos, &thistype);
-        }
+        if (thistype == TABLOL_STRING_TYPE)
+            _getWholeToken(_tilString, data, token, &pos, &thistype);
+        if (thistype == TABLOL_NUMBER_TYPE)
+            _getWholeToken(_tilNumber, data, token, &pos, &thistype);
+        if (thistype == TABLOL_COORDS_TYPE)
+            _getWholeToken(_tilCoords, data, token, &pos, &thistype);
 
-        if (token->size) {
+        if (token->size >= 1) {
             parser_newToken(token->data, thistype);
             ustr_clear(token);
         }
     }
 
     ustr_kill(token);
-    free(content);
-    parser_print();
+    free(data);
+    parser_execute();
 }
 
-void _getToken (__getUntil til, const char* content, struct ustr* token, size_t* pos, enum tokenType* type)
+bool _tilNumber (const char c)
 {
-    unsigned char npoints = 0;
-    do {
-        if (content[*pos] == '.')
-            npoints++;
-        ustr_pushBack(token, content[*pos]);
-        *pos += 1;
-    } while (til(content[*pos]));
+    return isdigit(c) || c == '.';
+}
 
-    /* Removes the first double-quote of the token to get
-     * only the string content itself. */
+bool _tilString (const char c)
+{
+    return c != '"';
+}
+
+bool _tilCoords (const char c)
+{
+    return isupper(c) || isdigit(c);
+}
+
+enum tablolTokenType _isThisType (const char thisc, const char nextc)
+{
+    if (thisc == '"')
+        return TABLOL_STRING_TYPE;
+    if (isdigit(thisc))
+        return TABLOL_NUMBER_TYPE;
+    if (thisc == '-' && isdigit(nextc))
+        return TABLOL_NUMBER_TYPE;
+    if (thisc == '@')
+        return TABLOL_COORDS_TYPE;
+
+    switch (thisc) {
+        case TABLOL_ADD_SY_TYPE: case TABLOL_SUB_SY_TYPE:
+        case TABLOL_MUL_SY_TYPE: case TABLOL_DIV_SY_TYPE:
+        case TABLOL_RPA_SY_TYPE: case TABLOL_LPA_SY_TYPE:
+        case TABLOL_EQU_SY_TYPE: {
+            char* token = (char*) malloc(2);
+            snprintf(token, 2, "%c", thisc);
+            parser_newToken(token, thisc);
+
+            free(token);
+            return thisc;
+        }
+    }
+
+    return TABLOL_UNKNOWN_TYPE;
+}
+
+void _getWholeToken (__getTil til, const char* data, struct ustr* token, size_t* pos, enum tablolTokenType* type)
+{
+    unsigned short npoints = 0;
+    do {
+        if (data[*pos] == '.')
+            npoints++;
+
+        ustr_pushBack(token, data[*pos]);
+        *pos += 1;
+    } while (til(data[*pos]));
+
     if (til == _tilString) {
         ustr_erase(token, 0, 0);
         return;
@@ -81,7 +117,7 @@ void _getToken (__getUntil til, const char* content, struct ustr* token, size_t*
     if (til == _tilNumber && npoints >= 2) {
         ustr_clear(token);
         ustr_append(token, "number_defintion!");
-        *type = TOKEN_TYPE_ERROR;
+        *type = TABLOL_ERROR_TYPE;
     }
 
     *pos -= 1;

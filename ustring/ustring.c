@@ -1,4 +1,6 @@
 #include "ustring.h"
+#include <string.h>
+#include <assert.h>
 
 struct ustr* ustr_make ()
 {

@@ -1,182 +1,204 @@
 #include "parser.h"
-#include <math.h>
+#include "yard-algo/yard-algo.h"
+#include <string.h>
 
-static struct Cell* __table;
-static size_t* __newrow_at;
-static size_t __numcells;
-static size_t __numrows;
+static struct tablolCell* __table;
+static size_t* __newrow_made_at;
+static size_t __numbercells;
+static size_t __numberrows;
 
-void _performCell (struct Cell*);
-void _setCellAsError (const char*, struct Cell*);
-void _cloneCell (struct Cell*);
-struct Cell* _getCellByCoords (struct Cell*);
-void _checkNoEmptyCell ();
+void _chechNoEmptyCell ();
+void _setErrorCell (struct tablolCell*, const char*);
+void _performCell (struct tablolCell*);
+void _cloneCell (struct tablolCell*);
+void* _getCellByCoords (struct tablolCell*, const char*, bool);
+void _doArithmetic (struct tablolCell*);
 
 void parser_init ()
 {
-    __table = (struct Cell*) malloc(0);
-    __numcells = 0;
-    __numrows = 1;
+    __table = (struct tablolCell*) malloc(0);
+    __numbercells = 0;
+    __numberrows = 1;
 
-    /* Saves the number of cell of every first cell
-     * in a new row. */
-    __newrow_at = (size_t*) malloc(sizeof(size_t));
-    __newrow_at[0] = 0;
+    __newrow_made_at = (size_t*) malloc(sizeof(size_t));
+    __newrow_made_at[0] = 0;
 }
 
 void parser_newCell ()
 {
-    _checkNoEmptyCell();
-    __table = (struct Cell*) realloc(
-        __table, ++__numcells * sizeof(struct Cell)
+    _chechNoEmptyCell();
+    __table = (struct tablolCell*) realloc(
+        __table,
+        ++__numbercells * sizeof(struct tablolCell)
     );
 
-    struct Cell newcell = {
-        .list = (struct Token*) malloc(0),
-        .numtokens = 0,
+    struct tablolCell newcell = {
+        .list = (struct tablolToken*) malloc(0),
+        .listsize = 0,
         .data = (char*) malloc(0),
-        .type = TOKEN_TYPE_UNKNOWN
+        .type = TABLOL_UNKNOWN_TYPE
     };
-    __table[__numcells - 1] = newcell;
+    __table[__numbercells - 1] = newcell;
 }
 
-void parser_setNewRow ()
+void parser_newRow ()
 {
-    /* If ain't cells how can rows exist? */
-    if (!__numcells)
+    if (!__numbercells)
         return;
 
-    __newrow_at = (size_t*) realloc(
-        __newrow_at, ++__numrows * sizeof(size_t)
+    __newrow_made_at = (size_t*) realloc(
+        __newrow_made_at,
+        ++__numberrows * sizeof(size_t)
     );
-
-    /* Since the current row has reached its end the
-     * next cell on the table is gonna be the first
-     * of the new row and it has a position of '__numcells'. */
-    __newrow_at[__numrows - 1] = __numcells;
+    __newrow_made_at[__numberrows - 1] = __numbercells;
 }
 
-void parser_newToken (const char* data, const enum tokenType type)
+void parser_newToken (const char* data, const enum tablolTokenType type)
 {
-    /* If ain't cells how can tokens exist? */
-    if (!__numcells)
+    if (!__numbercells)
         return;
 
-    struct Cell* currcell = &__table[__numcells - 1];
-    struct Token newtoken = {
-        .data = (char*) malloc(strlen(data)),
+    struct tablolCell* currcell = &__table[__numbercells - 1];
+    struct tablolToken newtoken = {
+        .data = (char*) malloc(strlen(data) + 1),
         .type = type
     };
     strcpy(newtoken.data, data);
 
-    /* The first token of every cell defines what that
-     * cell's gonna do, so the information of every first
-     * token is gonna be the same than the cell itself until
-     * the cell is performed. */
-    if (currcell->type == TOKEN_TYPE_UNKNOWN) {
-        currcell->data = (char*) malloc(strlen(data));
+    /* The first token of every cell defines what that cell is gonna
+     * perform, even if the token is an error. */
+    if (currcell->type == TABLOL_UNKNOWN_TYPE) {
+        currcell->data = (char*) realloc(currcell->data, strlen(data) + 1);
         strcpy(currcell->data, data);
+
         currcell->type = type;
     }
 
-    currcell->list = (struct Token*) realloc(
+    currcell->list = (struct tablolToken*) realloc(
         currcell->list,
-        ++currcell->numtokens * sizeof(struct Token)
+        ++currcell->listsize * sizeof(struct tablolToken)
     );
-    currcell->list[currcell->numtokens - 1] = newtoken;
+    currcell->list[currcell->listsize - 1] = newtoken;
 }
 
-void parser_print ()
+void parser_execute ()
 {
-    _checkNoEmptyCell();
-    unsigned currow = 0;
-    for (size_t i = 0; i < __numcells; i++) {
-        if (__newrow_at[currow] == i) {
+    _chechNoEmptyCell();
+    size_t currcellidx = 1;
+
+    for (size_t pos = 0; pos < __numbercells; pos++) {
+        if (__newrow_made_at[currcellidx] == pos) {
             putchar(10);
-            currow++;
+            currcellidx++;
         }
-        _performCell(&__table[i]);
+        _performCell(&__table[pos]);
     }
 
     free(__table);
-    free(__newrow_at);
+    free(__newrow_made_at);
     putchar(10);
 }
 
-void _performCell (struct Cell* cell)
+void _chechNoEmptyCell ()
 {
-    if (cell->type == TOKEN_TYPE_COORDS)
+    if (!__numbercells)
+        return;
+    if (!__table[__numbercells - 1].listsize)
+        _setErrorCell(&__table[__numbercells - 1], "empty_cell!");
+}
+
+void _setErrorCell (struct tablolCell* cell, const char* msg)
+{
+    cell->type = TABLOL_ERROR_TYPE;
+    cell->data = (char*) realloc(cell->data, strlen(msg) + 1);
+    strcpy(cell->data, msg);
+}
+
+void _performCell (struct tablolCell* cell)
+{
+    if (cell->type == TABLOL_COORDS_TYPE)
         _cloneCell(cell);
+    if (cell->type == TABLOL_EQU_SY_TYPE)
+        _doArithmetic(cell);
 
     printf("%s | ", cell->data);
-    for (size_t i = 0; i < cell->numtokens; i++)
+    for (size_t i = 0; i < cell->listsize; i++)
         free(cell->list[i].data);
     free(cell->list);
 }
 
-void _setCellAsError (const char* msg, struct Cell* cell)
+void _cloneCell (struct tablolCell* cell)
 {
-    cell->data = (char*) realloc(cell->data, strlen(msg));
-    strcpy(cell->data, msg);
-    cell->type = TOKEN_TYPE_ERROR;
-}
+    static struct tablolCell* beginsat = NULL;
+    struct tablolCell* copy = _getCellByCoords(cell, cell->data, false);
 
-void _cloneCell (struct Cell* cell)
-{
-    /* This cell make sure ain't a cycle
-     * while copying operation is being
-     * performed. */
-    static struct Cell* calledin = NULL;
-    struct Cell* clone = _getCellByCoords(cell);
-
-    if (cell == calledin) {
-        _setCellAsError("loop_dependecy!", cell);
+    if (cell == beginsat) {
+        _setErrorCell(cell, "loop_dependecy!");
         return;
     }
 
-    if (!calledin)
-        calledin = cell;
-    if (!clone) {
-        _setCellAsError("outta_range!", cell);
+    if (!beginsat)
+        beginsat = cell;
+    if (copy->type == TABLOL_ERROR_TYPE)
         return;
-    }
 
-    if (clone->type == TOKEN_TYPE_COORDS)
-        _cloneCell(clone);
+    if (copy->type == TABLOL_COORDS_TYPE)
+        _cloneCell(copy);
 
-
-    cell->type = clone->type;
-    cell->data = (char*) realloc(cell->data, strlen(clone->data));
-    strcpy(cell->data, clone->data);
-    calledin = NULL;
+    cell->type = copy->type;
+    cell->data = (char*) realloc(cell->data, strlen(copy->data) + 1);
+    strcpy(cell->data, copy->data);
+    beginsat = NULL;
 }
 
-struct Cell* _getCellByCoords (struct Cell* cell)
+void* _getCellByCoords (struct tablolCell* cell, const char* coord, bool onlydata)
 {
     unsigned row = 0, col = 0;
-    struct ustr* rowvalue = ustr_make();
+    struct ustr* rowis = ustr_make();
 
-    for (size_t i = 1; i < strlen(cell->data); i++) {
-        const char thisc = cell->data[i];
-        if (isupper(thisc)) col += thisc - 'A';
-        else ustr_pushBack(rowvalue, thisc);
+    for (size_t i = 1; i < strlen(coord); i++) {
+        const char thisc = coord[i];
+        if (isdigit(thisc))
+            ustr_pushBack(rowis, thisc);
+        else
+            col += thisc - 'A';
     }
 
-    if (rowvalue->size)
-        row += atoi(rowvalue->data);
+    if (rowis->size)
+        row = atoi(rowis->data);
+    ustr_kill(rowis);
 
-    free(rowvalue);
-    if (row >= __numrows)
+    unsigned position = __newrow_made_at[row] + col;
+    if (position >= __numbercells || row >= __numberrows) {
+        _setErrorCell(cell, "outta_range!");
         return NULL;
+    }
 
-    unsigned pos = __newrow_at[row] + col;
-    if (pos >= __numcells)
-        return NULL;
-    return &__table[pos];
+    if (onlydata)
+        return __table[position].data;
+    return &__table[position];
 }
 
-void _checkNoEmptyCell ()
+void _doArithmetic (struct tablolCell* cell)
 {
-    if (__numcells && !__table[__numcells - 1].numtokens)
-        _setCellAsError("empty_cell!", &__table[__numcells - 1]);
+    if (cell->listsize <= 3) {
+        _setErrorCell(cell, "missing_args!");
+        return;
+    }
+
+    struct yardAlgo* yard = yard_make();
+    for (size_t i = 1; i < cell->listsize; ++i) {
+        if (cell->list[i].type == TABLOL_COORDS_TYPE) {
+            char* number = (char*) _getCellByCoords(cell, cell->list[i].data, true);
+            if (cell->type == TABLOL_ERROR_TYPE)
+                return;
+            yard_evaluateToken (yard, number);
+        }
+        else
+            yard_evaluateToken (yard, cell->list[i].data);
+    }
+
+    cell->data = (char*) realloc(cell->data, 10);
+    snprintf(cell->data, 10, "%f", yard_solve(yard));
+    cell->type = TABLOL_NUMBER_TYPE;
 }
